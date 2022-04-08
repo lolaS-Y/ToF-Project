@@ -1,0 +1,334 @@
+---
+title: "Computing Assignment 3"
+author: "Jack Morgan"
+date: 21/04/2020
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+load(file = url("https://mfasiolo.github.io/TOI/gryphus2.RData"))
+(gryphus)
+
+#install.packages("gamlss.dist")
+#install.packages("MASS")
+#install.packages("DescTools")
+library(DescTools)
+library(MASS)
+library("gamlss.dist")
+```
+
+```{r}
+ll_gamma <- function(theta,df){
+  # Uses a log-transformation to allow unconstrained optimisation as a and b must be >= 0
+  alpha <- exp(theta[1])
+  s <- exp(theta[2])
+  
+  # Sets initital value of log-likelihood to zero
+  L <- 0
+  # Iterates through each row adding the probability of the outcome (0 or 1) to the log-likelihood
+  for (i in 1:(nrow(df))){
+    # Computes and stores the cdf of a Gamma(alpha,s) distribution
+    p <- pgamma(df[i,1], shape = alpha, scale = s)
+    if (is.nan(p)){
+      #cat(alpha,s)
+      return(9999)
+    }
+    # If surv = 1 then the proability of this occuring was p, and the probability of surv = 0 is (1-p)
+    if (df[i,2] == 1){
+      L <- L + log(p)
+    } else {
+      L <- L + log(1-p)
+    }
+  }
+  -L
+}
+
+#ll_gamma(c(0,0),gryphus)
+alpha0 <- mean(gryphus$dens)^2/var(gryphus$dens)
+s0 <- var(gryphus$dens)/mean(gryphus$dens)
+#optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,method="L-BFGS")
+#optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,method="BFGS")
+#optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,method="SANN")
+
+theta1 <- optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,method="BFGS")$par
+alpha <- exp(theta1[1])
+s <- exp(theta1[2])
+cat("\nalpha =",alpha," s =",s)
+```
+
+```{r}
+ll_lnorm <- function(theta,df){
+  # Uses a log-transformation to allow unconstrained optimisation as sigma must be >= 0
+  mu <- (theta[1])
+  sd <- sqrt(exp(theta[2]))
+  
+  # Sets initital value of log-likelihood to zero
+  L <- 0
+  # Iterates through each row adding the probability of the outcome (0 or 1) to the log-likelihood
+  for (i in 1:(nrow(df))){
+    # Computes and stores the cdf of a lnorm(mu,sd^2) distribution
+    p <- plnorm(df[i,1], mu, sd)
+    if (is.nan(p)){
+      cat(alpha,s)
+      return()
+    }
+    # If surv = 1 then the proability of this occuring was p, and the probability of surv = 0 is (1-p)
+    if (df[i,2] == 1){
+      L <- L + log(p)
+    } else {
+      L <- L + log(1-p)
+    }
+  }
+  -L
+}
+
+#ll_lnorm(c(0,0),gryphus)
+#optim(ll_lnorm,par=c((mean(log(gryphus$dens))),log(var(log(gryphus$dens)))),df=gryphus,method="BFGS")
+
+theta2 <- optim(ll_lnorm,par=c((mean(log(gryphus$dens))),log(var(log(gryphus$dens)))),df=gryphus,method="BFGS")$par
+
+#c((log(mean(gryphus$dens))),log(log(var(gryphus$dens))))
+#optim(ll_lnorm,par=c(0,0),df=gryphus,method="BFGS")
+
+#optim(ll_lnorm,par=c((log(mean(gryphus$dens))),log(0.5*log(var(gryphus$dens)))),df=gryphus,method="SANN")
+
+#theta2 <- optim(ll_lnorm,par=c(2.63,-3.5),df=gryphus,method="BFGS")$par
+mu <- (theta2[1])
+sigma_sq <- exp(theta2[2])
+cat("mu =",mu," sigma squared=",sigma_sq)
+
+
+
+```
+
+
+```{r}
+ll_gg <- function(theta,df){
+  # Uses a log-transformation to allow unconstrained optimisation as a and b must be >= 0. 
+  # No transformation for c as it can take any value in R
+  a <- exp(theta[1])
+  b <- exp(theta[2])
+  c <- (theta[3])
+  #cat(a,b,c,"\n")
+  #c <- 1
+  # Sets initital value of log-likelihood to zero
+  L <- 0
+  
+  # Iterates through each row adding the probability of the outcome (0 or 1) to the log-likelihood
+  for (i in 1:(nrow(df))){
+    
+    # Computes and stores the cdf of a Gamma(a,b) distribution
+    p <- pGG(df[i,1], a, b, c)
+    #cat(df[i,1],a,b,c,p,"\n")
+    if (is.infinite(p)){
+      cat(df[i,1],a,b,c)
+      return()
+    }
+    
+    if (is.nan(p)){
+      cat(df[i,1],mu = a, sigma = b, nu = c)
+      return()
+    }
+    # If surv = 1 then the proability of this occuring was p, and the probability of surv = 0 is (1-p)
+    if (df[i,2] == 1){
+      L <- L + log(p)
+    } else {
+      L <- L + log(1-p)
+    }
+  }
+  -L
+}
+
+#ll_gamma(c(0,0),gryphus)
+
+
+a0 <- mean(gryphus$dens)
+b0 <- sqrt(var(gryphus$dens)/(mean(gryphus$dens))^2)
+c0 <- 1
+
+#cat(log(a1),log(b1),c1)
+
+#optim(ll_gg,par=c(log(mu),log(sqrt(sigma_sq)),1),df=gryphus,method="BFGS")
+
+#optim(ll_gg,par=c(mean(gryphus$dens), sd(gryphus$dens),0),df=gryphus,method="BFGS")
+
+#theta3 <- optim(ll_gg,par=c(log(a0),log(b0),c0),df=gryphus,method="SANN")$par
+theta3 <- optim(ll_gg,par=c(log(alpha*s),log(sqrt(1/alpha)),c0),df=gryphus,method="BFGS")$par
+
+a <- exp(theta3[1])
+b <- exp(theta3[2])
+c <- theta3[3]
+cat("a =",a," b =",b," c =", c)
+
+
+#optim(ll_gg,par=c(log(a0),log(b0),c0),df=gryphus,method="SANN")
+
+#optim(ll_gg,par=c(2.5,-2,1),df=gryphus,method="BFGS")
+#?optim
+
+#pGG(mu, (mu),(sqrt(sigma_sq)),0)
+
+#pGG(mean(gryphus$dens)+5, mean(gryphus$dens), sd(gryphus$dens),0)
+
+#exp(mu)
+#mean(gryphus$dens)
+#var(gryphus$dens)
+optim(ll_gg,par=c(log(alpha*s),log(sqrt(1/alpha)),c0),df=gryphus,method="SANN")
+
+cat("\nalpha*s =",alpha*s,"  sqrt(1/alpha) =",sqrt(1/alpha))
+```
+
+
+
+```{r}
+plot_p <- function(df,lower,upper,steps=100,ylims = c(0,1)){
+  x <- seq(lower,upper,(upper - lower)/steps)
+  
+  theta1 <- optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,method="BFGS")$par
+  alpha <- exp(theta1[1])
+  s <- exp(theta1[2])
+  gamma_x <- pgamma(x,shape = alpha,scale = s)
+  
+  
+  theta2 <- optim(ll_lnorm,par=c((mean(log(gryphus$dens))),log(var(log(gryphus$dens)))),df=gryphus,method="BFGS")$par
+  mu <- (theta2[1])
+  sigma <- sqrt(exp(theta2[2]))
+  lnorm_x <- plnorm(x,mu,sigma)
+  
+  theta3 <- optim(ll_gg,par=c(log(alpha*s),log(sqrt(1/alpha)),c0),df=gryphus,method="SANN")$par
+  a <- exp(theta3[1])
+  b <- exp(theta3[2])
+  c <- theta3[3]
+  GG_x <- pGG(x,a,b,c)
+  
+  
+  plot(x, gamma_x,
+  main="Overlaying Graphs",
+  ylim = ylims,
+  ylab="Cumulative density",
+  xlab = "Density",
+  type="l",
+  col="blue")
+  lines(x, lnorm_x, col="red")
+  lines(x, GG_x, col="green")
+  legend("topleft",
+  c("Gamma","Log-normal","Generalised Gamma"),
+  fill=c("blue","red","green")
+  )
+}
+
+plot_p(gryphus,0,25,1000)
+#plot_p(gryphus,10,20,1000)
+#plot_p(gryphus,12.5,20,1000)
+
+
+
+```
+
+
+
+
+## Q2)
+Idea is to approximate the sampling distribution of the parameters, sample from
+theapproximate sampling distribution of the parameter p_sims, calculate the function
+value for each draw, and then trim alpha/2 from each tail of the distribution of the function values.
+
+Note; above was copied from an article so don't directly copy into final doc.
+
+How to approximate the sampling distribution:
+1. asymptotic distribution of MLE
+2. boostrap resampling
+
+Below we use the asymptotic distribution of the MLE.
+
+```{r}
+## Samples parameter value p_sims from asymptotic distribution of MLE 
+sampl_distr<- function(windf,n,dist = "gamma"){
+  if (dist == "gamma"){
+    fit <- optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,hessian = TRUE,method="BFGS")
+  } else if(dist == "lnorm"){
+    fit <- optim(ll_lnorm,par=c((mean(log(gryphus$dens))),log(var(log(gryphus$dens)))),df=gryphus,hessian = TRUE,method="BFGS")
+  }else{
+    print("Generealised Gamma not working yet")
+    return("ERROR")
+  }
+
+theta.ml <- (fit$par)
+I <- (solve(fit$hessian))
+theta_samp <- mvrnorm(n,theta.ml,I)
+return(theta_samp)
+}
+
+head(exp(sampl_distr(gryphus,1000,"lnorm")))
+```
+
+
+```{r}
+plot_CI <- function(df,n,lower,upper,steps,dist = "gamma"){
+  if(n%%40 != 0){
+    print("n must be a multiple of 40")
+    return()
+    }
+  theta_samp <- (sampl_distr(df,n,dist))
+  
+  x <- seq(lower,upper,(upper - lower)/steps)
+  
+  if (dist == "gamma"){
+    theta_samp <- exp(theta_samp)
+    p_sims <- sapply(x,pgamma,shape = theta_samp[,1],scale = theta_samp[,2])
+    
+    theta1 <- optim(ll_gamma,par=c(log(alpha0),log(s0)),df=gryphus,method="BFGS")$par
+    alpha <- exp(theta1[1])
+    s <- exp(theta1[2])
+    p_mle <- pgamma(x,shape = alpha,scale = s)
+  
+  }else if(dist == "lnorm"){
+    theta_samp[,2] <- sqrt(exp(theta_samp[,2]))
+    p_sims <- sapply(x,plnorm,meanlog = theta_samp[,1],sdlog = theta_samp[,2])
+    
+    theta2 <- optim(ll_lnorm,par=c((mean(log(gryphus$dens))),log(var(log(gryphus$dens)))),df=gryphus,method="BFGS")$par
+    mu <- (theta2[1])
+    sigma <- sqrt(exp(theta2[2]))
+    p_mle <- plnorm(x,mu,sigma)
+    
+  }else{
+    
+  }
+  
+  p_bounds <- data.frame()
+  for (i in 1:ncol(p_sims)){
+    bounds <- (quantile(p_sims[,i],c(0.025,0.975),names = FALSE))
+    p_bounds <- rbind(p_bounds,c(x[i],bounds[1],bounds[2]))
+  }
+  colnames(p_bounds) = c("Prey Density","Lower Bound","Upper Bound")
+  
+  plot(x, p_mle,
+  main="The Estimated Distribution of p",
+  ylim = c(0,1),
+  ylab="Cumulative density",
+  xlab = "Density",
+  type="l",
+  col="#0000FF")
+  lines(x, p_bounds[,2], col="#000066")
+  lines(x, p_bounds[,3], col="#000066")
+  legend("topleft",
+  c("Maximum Likelihood Estimate","Bounds"),
+  fill=c("#0000FF","#000066")
+  )
+}
+
+plot_CI(gryphus,10000,0,20,1000,dist = "lnorm")
+plot_CI(gryphus,10000,0,20,1000,dist = "gamma")
+
+## Will use quantile function.
+
+```
+Questions:
+- Generalised gamma not working for BFGS
+
